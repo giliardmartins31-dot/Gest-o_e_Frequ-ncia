@@ -1,0 +1,1067 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Controle de Frequência Avançado</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#1e293b">
+    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/3652/3652191.png">
+    
+    <style>
+        :root {
+            --primary-color: #1e293b; /* Azul Escuro Corporativo */
+            --secondary-color: #0284c7; /* Azul Notificações/Destaques */
+            --bg-color: #f1f5f9; /* Cinza bem claro para o fundo */
+            --text-color: #0f172a; /* Texto quase preto para excelente leitura */
+            --accent-color: #3b82f6; /* Azul Ativo */
+        }
+
+        *, *::before, *::after { box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: var(--bg-color); color: var(--text-color); margin: 0; padding: 0; }
+
+        /* Estilos da Notificação Deslizante */
+        #custom-alert {
+            position: fixed;
+            top: -100px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: #0f172a;
+            color: #ffffff;
+            padding: 16px 32px;
+            border-radius: 8px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+            font-weight: 600;
+            font-size: 14px;
+            z-index: 9999;
+            transition: top 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.3s;
+            opacity: 0;
+            display: flex;
+            align-items: center;
+            border-left: 5px solid var(--secondary-color);
+            min-width: 300px;
+            justify-content: center;
+        }
+        #custom-alert.show {
+            top: 24px;
+            opacity: 1;
+        }
+
+        /* Banner de Instalação do App */
+        #pwa-install-banner {
+            display: none;
+            background: #0284c7;
+            color: white;
+            padding: 12px 20px;
+            text-align: center;
+            font-weight: bold;
+            position: sticky;
+            top: 0;
+            z-index: 99999;
+        }
+        #pwa-install-banner button {
+            background: white;
+            color: #0284c7;
+            border: none;
+            padding: 6px 15px;
+            margin-left: 15px;
+            border-radius: 4px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        /* Login */
+        #login-screen { display: flex; justify-content: center; align-items: center; height: 100vh; background: linear-gradient(135deg, var(--primary-color), #334155); }
+        .login-box { background: white; padding: 40px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); width: 320px; text-align: center; }
+        .login-box h2 { margin-bottom: 20px; color: var(--primary-color); }
+        .login-box input { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #cbd5e1; border-radius: 4px; }
+
+        /* Botões */
+        .btn { background-color: var(--secondary-color); color: white; border: none; padding: 12px 20px; border-radius: 4px; cursor: pointer; font-weight: bold; width: 100%; transition: background 0.3s; }
+        .btn:hover { background-color: #0369a1; }
+        .btn-blue { background-color: var(--accent-color); }
+        .btn-blue:hover { background-color: #2563eb; }
+        .btn-danger { background-color: #ef4444; }
+        .btn-danger:hover { background-color: #dc2626; }
+        .btn-toggle { background-color: #64748b; padding: 6px 10px; font-size: 12px; width: auto; margin-right: 5px; color: white; border-radius: 4px; cursor: pointer; border: none;}
+        .btn-toggle:hover { background-color: #475569; }
+
+        /* Estilo específico para encurtar os botões do topo da planilha */
+        .btn-compact { padding: 6px 12px; font-size: 12px; font-weight: 600; }
+
+        #main-system { display: none; }
+        header { background-color: var(--primary-color); color: white; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; }
+        
+        .nav-tabs { display: flex; background: #e2e8f0; padding: 10px 20px 0 20px; border-bottom: 2px solid #cbd5e1; overflow-x: auto; }
+        .tab-btn { padding: 12px 20px; border: none; background: none; cursor: pointer; font-size: 15px; font-weight: 600; color: #64748b; white-space: nowrap; }
+        .tab-btn.active { color: var(--secondary-color); border-bottom: 3px solid var(--secondary-color); background: white; border-radius: 4px 4px 0 0; }
+        .tab-content { display: none; padding: 20px; }
+        .tab-content.active { display: block; }
+
+        .filter-bar { display: flex; flex-wrap: wrap; gap: 15px; margin-bottom: 20px; background: white; padding: 15px; border-radius: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); align-items: flex-end; }
+        .filter-group { display: flex; flex-direction: column; gap: 5px; }
+        .filter-group label { font-weight: bold; font-size: 14px; color: #334155; }
+        .filter-group select, .filter-group input { padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 4px; min-width: 120px; color: var(--text-color); }
+
+        /* Tabela de Lançamento com Travamento (Sticky) */
+        .table-wrapper { position: relative; max-height: 65vh; overflow: auto; border: 1px solid #cbd5e1; background: white; border-radius: 4px; }
+        table { border-collapse: separate; border-spacing: 0; width: 100%; font-size: 13px; }
+        th, td { border-right: 1px solid #cbd5e1; border-bottom: 1px solid #cbd5e1; padding: 6px 8px; text-align: center; white-space: nowrap; }
+        
+        thead tr:nth-child(1) th { position: sticky; top: 0; z-index: 6; background-color: var(--primary-color); color: white; }
+        thead tr:nth-child(2) th { position: sticky; top: 32px; z-index: 6; background-color: var(--primary-color); color: white; }
+
+        .col-mat { width: 80px; min-width: 80px; max-width: 80px; }
+        .col-nome { width: auto; text-align: left; cursor: pointer; user-select: none; padding-right: 20px !important; }
+        .col-fun { width: 130px; min-width: 130px; max-width: 130px; text-align: left; }
+
+        .sticky-col-1 { position: sticky; left: 0; z-index: 4; background-color: #f8fafc; font-weight: bold; }
+        thead tr:nth-child(1) th.sticky-col-1, thead tr:nth-child(2) th.sticky-col-1 { z-index: 7 !important; left: 0; }
+
+        tr.linha-marcada td { background-color: #bae6fd !important; }
+        tr.linha-marcada td.sticky-col-1 { background-color: #7dd3fc !important; }
+        tr.linha-marcada td.sunday { background-color: #f87171 !important; } 
+
+        .select-cell { padding: 2px; border: none; background: transparent; font-weight: bold; width: 42px; cursor: pointer; text-align: center; }
+        .status-F { background-color: #fee2e2 !important; color: #991b1b !important; }
+        .status-S { background-color: #e0f2fe !important; color: #075985 !important; }
+        .status-A { background-color: #dcfce7 !important; color: #166534 !important; }
+        .status-AV { background-color: #fef9c3 !important; color: #854d0e !important; }
+        .status-AE { background-color: #fef08a !important; color: #854d0e !important; font-weight: bold !important; }
+        .status-Sus { background-color: #fca5a5 !important; color: #991b1b !important; font-weight: bold !important; }
+        .status-FE { background-color: #ccfbf1 !important; color: #115e59 !important; font-weight: bold !important; } 
+        
+        .status-DESL { background-color: #cbd5e1 !important; color: #475569 !important; font-size: 10px; font-weight: bold; display: inline-block; width: 100%; padding: 4px 0; border-radius: 3px; text-align: center; }
+        td.cell-desligado { background-color: #e2e8f0 !important; }
+
+        .current-day-col { background-color: #eff6ff !important; border-left: 2px dashed #3b82f6 !important; border-right: 2px dashed #3b82f6 !important; }
+        th.current-day-col { background-color: #1d4ed8 !important; color: white !important; }
+
+        .sunday { background-color: #fca5a5 !important; color: #7f1d1d !important; }
+        th.sunday { color: #ffffff !important; }
+        .saturday { background-color: transparent; }
+
+        /* Modais */
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 10; justify-content: center; align-items: center; }
+        .modal-content { background: white; padding: 25px; border-radius: 8px; width: 95%; max-width: 700px; max-height: 85vh; overflow-y: auto; position: relative; }
+        .close-modal { position: absolute; top: 15px; right: 20px; font-size: 24px; cursor: pointer; color: #94a3b8; }
+        .feedback-entry { background: #f8fafc; padding: 10px; margin-bottom: 10px; border-left: 4px solid var(--accent-color); border-radius: 4px; border-top: 1px solid #e2e8f0; border-right: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0; position: relative; }
+
+        .btn-deletar-feedback { position: absolute; top: 5px; right: 10px; color: #ef4444; font-size: 18px; font-weight: bold; cursor: pointer; transition: color 0.2s; }
+        .btn-deletar-feedback:hover { color: #b91c1c; }
+
+        /* Design do Resumo */
+        .doc-frequencia-container { background-color: #ffffff !important; color: #000000 !important; font-family: Arial, sans-serif; padding: 10px; }
+        .doc-header { display: flex; justify-content: space-between; border-bottom: 2px solid #000; padding-bottom: 8px; margin-bottom: 15px; }
+        .doc-title h2 { margin: 0; font-size: 18px; color: #111; text-transform: uppercase; }
+        .doc-title p { margin: 4px 0 0 0; font-size: 12px; color: #444; }
+        .doc-meta { text-align: right; font-size: 11px; color: #111; }
+        
+        .doc-section-title { background-color: #f1f5f9 !important; padding: 5px 8px; font-size: 12px; font-weight: bold; color: #000; border: 1px solid #ccc; margin: 15px 0 8px 0; text-transform: uppercase; page-break-inside: avoid; }
+        
+        .ficha-dados { width: 100%; border-collapse: collapse; margin-bottom: 15px; page-break-inside: avoid; table-layout: fixed; border: 1px solid #ccc; }
+        .ficha-dados td { padding: 8px 12px; font-size: 13px; text-align: left; color: #000; vertical-align: top; border-bottom: 1px solid #ddd; border-right: 1px solid #ddd; }
+        .ficha-dados td:last-child { border-right: none; }
+        .ficha-dados tr:last-child td { border-bottom: none; }
+        .ficha-dados .label-small { display: block; font-size: 10px; text-transform: uppercase; color: #555; font-weight: bold; margin-bottom: 4px; letter-spacing: 0.5px; }
+        .ficha-dados .valor-grande { display: block; font-size: 14px; font-weight: bold; color: #000; line-height: 1.3; }
+
+        .tabela-alinhada { width: 100%; border-collapse: collapse; margin-top: 5px; page-break-inside: avoid; }
+        .tabela-alinhada th { background-color: #f1f5f9; color: #000; padding: 7px; border: 1px solid #aaa; font-size: 12px; text-align: center; }
+        .tabela-alinhada td { padding: 7px; border: 1px solid #aaa; font-size: 12px; text-align: center; color: #000; }
+
+        .bloco-texto-print { border: 1px solid #ccc; background: #fafafa; padding: 10px; border-radius: 4px; min-height: 40px; }
+
+        /* Tabela Cadastro */
+        .cadastro-container { max-height: 55vh; overflow: auto; background: white; border-radius: 4px; border: 1px solid #cbd5e1; }
+        .tabela-cadastro { width: 100%; border-collapse: separate; border-spacing: 0; }
+        .tabela-cadastro th { position: sticky; top: 0; background-color: #e2e8f0; color: #334155; padding: 12px 14px; font-weight: bold; font-size: 13px; border-bottom: 2px solid #cbd5e1; text-align: left; z-index: 5; white-space: nowrap; }
+        .tabela-cadastro td { padding: 6px 10px; border-bottom: 1px solid #e2e8f0; vertical-align: middle; white-space: nowrap; }
+        
+        .tabela-cadastro input[type="text"] { width: auto; min-width: 180px; padding: 6px 10px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 13px; color: var(--text-color); background: white; }
+        .tabela-cadastro td:nth-child(2) input { min-width: 280px; width: 100%; } 
+        .tabela-cadastro input[type="date"], .tabela-cadastro select { width: 100%; min-width: 115px; padding: 6px 10px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 13px; color: var(--text-color); background: white; }
+
+        /* Dashboard */
+        .dashboard-grid { display: grid; grid-template-columns: 1fr; gap: 20px; margin-top: 15px; }
+        @media(min-width: 900px) { .dashboard-grid { grid-template-columns: 1fr 1fr; } }
+        .dash-card { background: white; border: 1px solid #cbd5e1; border-radius: 6px; padding: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .dash-card h4 { margin-top: 0; color: var(--primary-color); border-bottom: 2px solid #f1f5f9; padding-bottom: 8px; font-size: 15px; display: flex; justify-content: space-between; align-items: center; }
+        .ranking-item { display: flex; align-items: center; justify-content: space-between; padding: 8px 0; border-bottom: 1px dashed #e2e8f0; font-size: 13px; }
+        .ranking-count { background: #fee2e2; color: #991b1b; padding: 2px 8px; border-radius: 12px; font-weight: bold; font-size: 12px; }
+        .ranking-count.atestado { background: #dcfce7; color: #166534; }
+        
+        .chart-row { margin-bottom: 12px; }
+        .chart-label { font-size: 12px; margin-bottom: 4px; font-weight: 500; display: flex; justify-content: space-between; }
+        .chart-bar-bg { background: #e2e8f0; height: 16px; border-radius: 4px; overflow: hidden; width: 100%; position: relative; }
+        .chart-bar-fill { height: 100%; transition: width 0.4s ease-out; }
+        .fill-falta { background-color: #ef4444; }
+        .fill-atestado { background-color: #10b981; }
+
+        @media print {
+            body * { visibility: hidden; }
+            #conteudo-preview-isolado, #conteudo-preview-isolado * { visibility: visible; color: #000000 !important; border-color: #000000 !important; }
+            #conteudo-preview-isolado .status-F, #conteudo-preview-isolado .status-S, #conteudo-preview-isolado .status-A, #conteudo-preview-isolado .status-AV, #conteudo-preview-isolado .status-AE, #conteudo-preview-isolado .status-Sus, #conteudo-preview-isolado .status-FE { background-color: transparent !important; color: #000000 !important; border: 1px solid #000000 !important; font-weight: bold !important; }
+            #conteudo-preview-isolado { position: absolute; left: 0; top: 0; width: 100%; margin: 0; padding: 0; }
+            .doc-section-title { background-color: #f1f5f9 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; color: #000000 !important; }
+            .tabela-alinhada th { background-color: #f1f5f9 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; color: #000000 !important; }
+            @page { size: A4 portrait; margin: 15mm 10mm 15mm 10mm; }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="pwa-install-banner">
+        Disponível para instalar no seu celular ou PC!
+        <button id="btn-pwa-install">Instalar App</button>
+    </div>
+
+    <div id="custom-alert"></div>
+
+    <div id="app-container">
+        <div id="login-screen">
+            <div class="login-box">
+                <h2>Acesso ao Sistema</h2>
+                <input type="text" id="username" placeholder="Usuário (Admin)">
+                <input type="password" id="password" placeholder="Senha (1234)">
+                <button class="btn" onclick="login()">Entrar</button>
+            </div>
+        </div>
+
+        <div id="main-system">
+            <header>
+                <h2>Gestão de Frequência</h2>
+                <div style="display:flex; gap:10px;">
+                    <button class="btn btn-blue" style="width:auto;" onclick="abrirPainelFeedback()">Histórico & Feedback</button>
+                    <button class="btn btn-danger" style="width: auto;" onclick="logout()">Sair</button>
+                </div>
+            </header>
+
+            <div class="nav-tabs">
+                <button class="tab-btn active" onclick="switchTab('frequencia')">Frequência Mensal</button>
+                <button class="tab-btn" onclick="switchTab('historico-graficos')">📊 Histórico & Gráficos</button>
+                <button class="tab-btn" onclick="switchTab('cadastro-lider')">Estrutura & Líderes</button>
+                <button class="tab-btn" onclick="switchTab('cadastro-colaborador')">Cadastro de Colaboradores</button>
+                <button class="tab-btn" onclick="switchTab('relatorios')">Relatórios & PDFs</button>
+            </div>
+
+            <div id="frequencia" class="tab-content active">
+                <div class="filter-bar">
+                    <div class="filter-group">
+                        <label for="filtro-ano">Ano:</label>
+                        <select id="filtro-ano" onchange="renderFrequencia()"></select>
+                    </div>
+                    <div class="filter-group">
+                        <label for="filtro-mes">Mês:</label>
+                        <select id="filtro-mes" onchange="renderFrequencia()">
+                            <option value="0">Janeiro</option><option value="1">Fevereiro</option>
+                            <option value="2">Março</option><option value="3">Abril</option>
+                            <option value="4">Maio</option><option value="5">Junho</option>
+                            <option value="6">Julho</option><option value="7">Agosto</option>
+                            <option value="8">Setembro</option><option value="9">Outubro</option>
+                            <option value="10">Novembro</option><option value="11">Dezembro</option>
+                        </select>
+                    </div>
+                    <div style="display: flex; gap: 8px;">
+                        <button class="btn btn-compact" style="width:auto;" onclick="salvarDadosMes()">Salvar no Navegador</button>
+                        <button class="btn btn-blue btn-compact" style="width:auto; background-color: #059669;" onclick="salvarArquivoBackup()">💾 Salvar Backup</button>
+                        <button class="btn btn-blue btn-compact" style="width:auto; background-color: #d97706;" onclick="carregarArquivoBackup()">📂 Carregar Backup</button>
+                    </div>
+                </div>
+
+                <div class="table-wrapper" id="tabela-wrapper-id">
+                    <table id="tabela-frequencia">
+                        <thead>
+                            <tr id="thr-1"></tr>
+                            <tr id="thr-2"></tr>
+                        </thead>
+                        <tbody id="tbody-frequencia"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div id="historico-graficos" class="tab-content">
+                <h3>Histórico Consolidado da Equipe</h3>
+                <div class="filter-bar">
+                    <div class="filter-group">
+                        <label for="dash-periodo">Período de Análise:</label>
+                        <select id="dash-periodo" onchange="toggleFiltrosDashboard()">
+                            <option value="mes-ano">Mês e Ano Especificados</option>
+                            <option value="todos-anos">Todo o Histórico (Todos os Anos Anteriores)</option>
+                        </select>
+                    </div>
+                    <div class="filter-group" id="group-dash-ano">
+                        <label for="dash-ano">Ano:</label>
+                        <select id="dash-ano" onchange="renderDashboard()"></select>
+                    </div>
+                    <div class="filter-group" id="group-dash-mes">
+                        <label for="dash-mes">Mês:</label>
+                        <select id="dash-mes" onchange="renderDashboard()">
+                            <option value="0">Janeiro</option><option value="1">Fevereiro</option>
+                            <option value="2">Março</option><option value="3">Abril</option>
+                            <option value="4">Maio</option><option value="5">Junho</option>
+                            <option value="6">Julho</option><option value="7">Agosto</option>
+                            <option value="8">Setembro</option><option value="9">Outubro</option>
+                            <option value="10">Novembro</option><option value="11">Dezembro</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="dashboard-grid">
+                    <div class="dash-card">
+                        <h4>⚠️ Colaboradores com Mais Ausências (Faltas e Atestados)</h4>
+                        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:15px;">
+                            <div>
+                                <h5 style="margin: 10px 0 5px 0; color: #b91c1c;">Mais Faltas (F)</h5>
+                                <div id="ranking-faltas">Carregando...</div>
+                            </div>
+                            <div>
+                                <h5 style="margin: 10px 0 5px 0; color: #15803d;">Mais Atestados (A)</h5>
+                                <div id="ranking-atestados">Carregando...</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="dash-card">
+                        <h4>📊 Distribuição de Ocorrências (Gráficos Comparativos)</h4>
+                        <div id="graficos-container" style="margin-top:15px;">Carregando gráficos...</div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="cadastro-lider" class="tab-content">
+                <h3>Estrutura Operacional</h3>
+                <div class="form-group" style="margin-bottom: 12px;">
+                    <label for="lider-linha" style="display:block; font-weight:bold; margin-bottom:4px;">Setor / Linha:</label>
+                    <input type="text" id="lider-linha" style="width:100%; max-width:400px; padding:8px; border:1px solid #cbd5e1; border-radius:4px;">
+                </div>
+                <div class="form-group" style="margin-bottom: 12px;">
+                    <label for="turno" style="display:block; font-weight:bold; margin-bottom:4px;">Turno:</label>
+                    <select id="turno" style="width:100%; max-width:400px; padding:8px; border:1px solid #cbd5e1; border-radius:4px;">
+                        <option value="1º Turno">1º Turno</option>
+                        <option value="2º Turno">2º Turno</option>
+                        <option value="3º Turno">3º Turno</option>
+                    </select>
+                </div>
+                <div class="form-group" style="margin-bottom: 12px;">
+                    <label for="lider-nome" style="display:block; font-weight:bold; margin-bottom:4px;">Líder de Equipe:</label>
+                    <input type="text" id="lider-nome" style="width:100%; max-width:400px; padding:8px; border:1px solid #cbd5e1; border-radius:4px;">
+                </div>
+                <div class="form-group" style="margin-bottom: 15px;">
+                    <label for="supervisor-turno" style="display:block; font-weight:bold; margin-bottom:4px;">Supervisor Direto:</label>
+                    <input type="text" id="supervisor-turno" style="width:100%; max-width:400px; padding:8px; border:1px solid #cbd5e1; border-radius:4px;">
+                </div>
+                <button class="btn" style="max-width:200px;" onclick="salvarLideres()">Salvar Estrutura</button>
+            </div>
+
+            <div id="cadastro-colaborador" class="tab-content">
+                <h3>Cadastro Geral de Colaboradores</h3>
+                <div class="cadastro-container">
+                    <table class="tabela-cadastro">
+                        <thead>
+                            <tr>
+                                <th>Matrícula</th>
+                                <th>Nome Completo (PDF)</th>
+                                <th>Nome Destaque (Planilha)</th>
+                                <th>Função</th>
+                                <th>Admissão</th>
+                                <th>Status</th>
+                                <th>Data Desligamento</th>
+                            </tr>
+                        </thead>
+                        <tbody id="lista-cadastro-colaboradores"></tbody>
+                    </table>
+                </div>
+                <div style="display: flex; gap: 15px; margin-top: 20px; flex-wrap: wrap;">
+                    <button class="btn" style="max-width:250px;" onclick="salvarListaColaboradores()">Atualizar Cadastro Master</button>
+                    <button class="btn btn-blue" style="max-width:250px;" onclick="replicarParaProximoAno()">🔄 Replicar para o Próximo Ano</button>
+                </div>
+            </div>
+
+            <div id="relatorios" class="tab-content">
+                <h3>Emissão de Ficha Unificada de Ocorrências e Frequência</h3>
+                <div class="filter-bar">
+                    <div class="filter-group">
+                        <label for="rep-colaborador">Selecione o Colaborador:</label>
+                        <select id="rep-colaborador" style="min-width: 250px;"></select>
+                    </div>
+                    <div class="filter-group">
+                        <label for="rep-ano">Ano:</label>
+                        <select id="rep-ano"></select>
+                    </div>
+                    <div class="filter-group">
+                        <label for="rep-periodo">Período de Abrangência:</label>
+                        <select id="rep-periodo" onchange="verificarVisibilidadeMes()">
+                            <option value="mensal">Apenas o Mês Selecionado</option>
+                            <option value="anual">Ano Inteiro Consolidado</option>
+                        </select>
+                    </div>
+                    <div class="filter-group" id="container-rep-mes">
+                        <label for="rep-mes">Mês:</label>
+                        <select id="rep-mes">
+                            <option value="0">Janeiro</option><option value="1">Fevereiro</option>
+                            <option value="2">Março</option><option value="3">Abril</option>
+                            <option value="4">Maio</option><option value="5">Junho</option>
+                            <option value="6">Julho</option><option value="7">Agosto</option>
+                            <option value="8">Setembro</option><option value="9">Outubro</option>
+                            <option value="10">Novembro</option><option value="11">Dezembro</option>
+                        </select>
+                    </div>
+                </div>
+                <div style="margin-top:15px; margin-bottom:20px; display: flex; gap: 12px; flex-wrap: wrap;">
+                    <button class="btn btn-blue" style="width:auto; padding: 12px 25px; background-color: #7c3aed;" onclick="gerarRelatorioConsolidadoCompleto()">📋 Gerar Relatório Consolidado Completo</button>
+                </div>
+                <div id="preview-relatorio" style="background:white; padding:20px; border-radius:6px; border:1px solid #cbd5e1; display:none; max-width: 800px; margin: 0 auto;">
+                    <div style="text-align:right; margin-bottom: 15px; background: #f1f5f9; padding: 10px; border-radius:4px;">
+                        <button class="btn" style="width:auto; background-color: #10b981;" onclick="baixarFichaPDF()">📥 Confirmar e Salvar PDF / Imprimir</button>
+                    </div>
+                    <div id="conteudo-preview-isolado"></div>
+                </div>
+            </div>
+        </div>
+
+        <div id="modal-feedback" class="modal">
+            <div class="modal-content">
+                <span class="close-modal" onclick="fecharModal()">&times;</span>
+                <h3>Painel de Feedback & Alinhamento</h3>
+                
+                <div class="form-group">
+                    <label for="feed-colaborador">Colaborador de Referência:</label>
+                    <select id="feed-colaborador" style="width:100%; padding:8px; border-radius:4px; border:1px solid #cbd5e1;"></select>
+                </div>
+                <div class="form-group" style="margin-top:10px;">
+                    <label for="feed-texto">Feedback Individual ou Reunião Geral:</label>
+                    <textarea id="feed-texto" rows="4" style="width:100%; padding:8px; border-radius:4px; border:1px solid #cbd5e1; font-family:inherit;" placeholder="Digite o feedback individual ou os pontos abordados na reunião geral de equipe..."></textarea>
+                </div>
+                
+                <div style="display: flex; gap: 10px; margin-top: 12px;">
+                    <button class="btn" onclick="salvarFeedbackIndividual()" style="background-color: #0284c7;">Registrar</button>
+                    <button class="btn btn-blue" onclick="salvarReuniaoGeral()" style="background-color: #059669;">Reunião geral</button>
+                </div>
+                
+                <h4 style="margin-top:25px; border-top:1px solid #e2e8f0; padding-top:15px;">Linha do Tempo de Feedbacks</h4>
+                <div id="timeline-feedback"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let lideres = JSON.parse(localStorage.getItem('f_lideres')) || { linha: '', turno: '1º Turno', lider: '', supervisor: '' };
+        let historicoColaboradores = JSON.parse(localStorage.getItem('f_historico_colab')) || {};
+        let feedbackDados = JSON.parse(localStorage.getItem('f_feedbacks')) || {};
+        let dadosFrequencia = JSON.parse(localStorage.getItem('f_dados')) || {};
+        let colaboradoresAtuais = JSON.parse(localStorage.getItem('f_colaboradores')) || [];
+
+        const labelsOcorrenciasCompletas = {
+            'F': 'Falta Não Justificada',
+            'S': 'Saída Antecipada / Atraso',
+            'A': 'Atestado Médico',
+            'AV': 'Advertência Verbal',
+            'AE': 'Advertência Escrita',
+            'Sus': 'Suspensão Disciplinar',
+            'FE': 'Período de Férias'
+        };
+
+        colaboradoresAtuais.forEach(c => {
+            if(!c.nomeDestaque) c.nomeDestaque = c.nome ? c.nome.substring(0, 15) : '';
+            if(!c.status) c.status = 'Ativo';
+            if(!c.desligamento) c.desligamento = '';
+        });
+
+        let handleDoArquivoBackup = null;
+
+        function exibirMensagem(mensagem) {
+            const alertaEl = document.getElementById('custom-alert');
+            const nomeDoLider = (lideres && lideres.lider && lideres.lider.trim() !== "") ? lideres.lider.trim() : "Líder";
+            
+            alertaEl.innerHTML = `Olá, ${nomeDoLider}, ${mensagem}`;
+            alertaEl.classList.add('show');
+            
+            setTimeout(() => {
+                alertaEl.classList.remove('show');
+            }, 3000);
+        }
+
+        function popularAnos() {
+            ['filtro-ano', 'rep-ano', 'dash-ano'].forEach(id => {
+                const el = document.getElementById(id); el.innerHTML = '';
+                for(let a = 2025; a <= 2032; a++) {
+                    let opt = document.createElement('option'); opt.value = a; opt.textContent = a; el.appendChild(opt);
+                }
+            });
+        }
+        popularAnos();
+        
+        const dataObjetoAtual = new Date();
+        const anoAtualSistema = dataObjetoAtual.getFullYear(); 
+        document.getElementById('filtro-ano').value = anoAtualSistema;
+        document.getElementById('filtro-mes').value = dataObjetoAtual.getMonth();
+        document.getElementById('dash-ano').value = anoAtualSistema;
+        document.getElementById('dash-mes').value = dataObjetoAtual.getMonth();
+
+        if (!historicoColaboradores[anoAtualSistema]) {
+            historicoColaboradores[anoAtualSistema] = {};
+            for (let m = 0; m < 12; m++) {
+                historicoColaboradores[anoAtualSistema][m] = JSON.parse(JSON.stringify(colaboradoresAtuais));
+            }
+            localStorage.setItem('f_historico_colab', JSON.stringify(historicoColaboradores));
+        }
+
+        async function salvarArquivoBackup() {
+            const dadosParaSalvar = {
+                lideres: localStorage.getItem('f_lideres'),
+                historicoColaboradores: localStorage.getItem('f_historico_colab'),
+                feedbackDados: localStorage.getItem('f_feedbacks'),
+                dadosFrequencia: localStorage.getItem('f_dados'),
+                colaboradoresAtuais: localStorage.getItem('f_colaboradores')
+            };
+            const textoJson = JSON.stringify(dadosParaSalvar, null, 2);
+            try {
+                if (!handleDoArquivoBackup) {
+                    const opcoes = { suggestedName: 'backup_frequencia_master.json', types: [{ description: 'Arquivo de Backup JSON', accept: {'application/json': ['.json']}}] };
+                    handleDoArquivoBackup = await window.showSaveFilePicker(opcoes);
+                }
+                const writable = await handleDoArquivoBackup.createWritable();
+                await writable.write(textoJson);
+                await writable.close();
+                exibirMensagem('Backup salvo com sucesso!');
+            } catch (err) { if (err.name !== 'AbortError') exibirMensagem('Erro ao salvar o arquivo de backup.'); }
+        }
+
+        async function carregarArquivoBackup() {
+            try {
+                const [fileHandle] = await window.showOpenFilePicker({ types: [{ description: 'Arquivo de Backup JSON', accept: {'application/json': ['.json']}}] });
+                handleDoArquivoBackup = fileHandle;
+                const file = await fileHandle.getFile();
+                const conteudo = await file.text();
+                const backup = JSON.parse(conteudo);
+                if (backup.lideres) localStorage.setItem('f_lideres', backup.lideres);
+                if (backup.historicoColaboradores) localStorage.setItem('f_historico_colab', backup.historicoColaboradores);
+                if (backup.feedbackDados) localStorage.setItem('f_feedbacks', backup.feedbackDados);
+                if (backup.dadosFrequencia) localStorage.setItem('f_dados', backup.dadosFrequencia);
+                if (backup.colaboradoresAtuais) localStorage.setItem('f_colaboradores', backup.colaboradoresAtuais);
+                exibirMensagem('Backup carregado com sucesso!'); window.location.reload();
+            } catch (err) { if (err.name !== 'AbortError') exibirMensagem('Erro ao carregar o arquivo de backup.'); }
+        }
+
+        function login() {
+            if(document.getElementById('username').value === 'Admin' && document.getElementById('password').value === '1234') {
+                document.getElementById('login-screen').style.display = 'none';
+                document.getElementById('main-system').style.display = 'block';
+                inicializarSistema();
+            } else { exibirMensagem('Usuário ou senha incorretos!'); }
+        }
+        function logout() { document.getElementById('login-screen').style.display = 'flex'; document.getElementById('main-system').style.display = 'none'; }
+
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            
+            const btnTarget = Array.from(document.querySelectorAll('.tab-btn')).find(b => b.getAttribute('onclick') && b.getAttribute('onclick').includes(tabId));
+            if(btnTarget) btnTarget.classList.add('active');
+            
+            document.getElementById(tabId).classList.add('active');
+            if(tabId === 'frequencia') renderFrequencia();
+            if(tabId === 'historico-graficos') renderDashboard();
+            if(tabId === 'cadastro-colaborador') atualizarFormularioCadastro();
+            if(tabId === 'relatorios') atualizarSeletoresRelatorios();
+        }
+
+        function verificarVisibilidadeMes() {
+            const p = document.getElementById('rep-periodo').value;
+            document.getElementById('container-rep-mes').style.display = (p === 'anual') ? 'none' : 'flex';
+        }
+
+        function toggleFiltrosDashboard() {
+            const escopo = document.getElementById('dash-periodo').value;
+            if(escopo === 'todos-anos') {
+                document.getElementById('group-dash-ano').style.display = 'none';
+                document.getElementById('group-dash-mes').style.display = 'none';
+            } else {
+                document.getElementById('group-dash-ano').style.display = 'flex';
+                document.getElementById('group-dash-mes').style.display = 'flex';
+            }
+            renderDashboard();
+        }
+
+        function inicializarSistema() {
+            document.getElementById('lider-linha').value = lideres.linha || '';
+            document.getElementById('turno').value = lideres.turno || '1º Turno';
+            document.getElementById('lider-nome').value = lideres.lider || '';
+            document.getElementById('supervisor-turno').value = lideres.supervisor || '';
+            atualizarFormularioCadastro();
+            renderFrequencia();
+        }
+
+        function atualizarFormularioCadastro() {
+            const container = document.getElementById('lista-cadastro-colaboradores'); container.innerHTML = '';
+            colaboradoresAtuais.forEach((c, idx) => {
+                const isAtivo = (c.status !== 'Desligado');
+                container.innerHTML += `<tr>
+                    <td><input type="text" value="${c.matricula}" id="cad-mat-${idx}" style="min-width: 90px; max-width: 120px;"></td>
+                    <td><input type="text" value="${c.nome}" id="cad-nome-${idx}"></td>
+                    <td><input type="text" value="${c.nomeDestaque || ''}" id="cad-destaque-${idx}"></td>
+                    <td><input type="text" value="${c.funcao || 'Operador'}" id="cad-fun-${idx}"></td>
+                    <td><input type="date" value="${c.admissao || ''}" id="cad-adm-${idx}"></td>
+                    <td><select id="cad-status-${idx}"><option value="Ativo" ${isAtivo ? 'selected' : ''}>Ativo</option><option value="Desligado" ${!isAtivo ? 'selected' : ''}>Desligado</option></select></td>
+                    <td><input type="date" value="${c.desligamento || ''}" id="cad-desl-${idx}"></td>
+                </tr>`;
+            });
+            const nextIdx = colaboradoresAtuais.length;
+            container.innerHTML += `<tr>
+                <td><input type="text" id="cad-mat-${nextIdx}" placeholder="Nova Matrícula" style="min-width: 90px; max-width: 120px;" oninput="checarNovaLinhaCadastro(${nextIdx})"></td>
+                <td><input type="text" id="cad-nome-${nextIdx}" placeholder="Nome Completo" oninput="checarNovaLinhaCadastro(${nextIdx})"></td>
+                <td><input type="text" id="cad-destaque-${nextIdx}" placeholder="Nome Curto" oninput="checarNovaLinhaCadastro(${nextIdx})"></td>
+                <td><input type="text" value="Operador" id="cad-fun-${nextIdx}" oninput="checarNovaLinhaCadastro(${nextIdx})"></td>
+                <td><input type="date" id="cad-adm-${nextIdx}" oninput="checarNovaLinhaCadastro(${nextIdx})"></td>
+                <td><select id="cad-status-${nextIdx}"><option value="Ativo" selected>Ativo</option><option value="Desligado">Desligado</option></select></td>
+                <td><input type="date" id="cad-desl-${nextIdx}"></td>
+            </tr>`;
+        }
+
+        function checarNovaLinhaCadastro(index) {
+            if (index === colaboradoresAtuais.length) {
+                const matVal = document.getElementById(`cad-mat-${index}`).value.trim();
+                const nomeVal = document.getElementById(`cad-nome-${index}`).value.trim();
+                if (matVal !== "" || nomeVal !== "") {
+                    colaboradoresAtuais.push({ matricula: matVal, nome: nomeVal, nomeDestaque: '', funcao: 'Operador', admissao: '', status: 'Ativo', desligamento: '' });
+                    capturarValoresCampos(); atualizarFormularioCadastro();
+                    document.getElementById(`cad-nome-${index}`).focus();
+                }
+            }
+        }
+
+        function capturarValoresCampos() {
+            const lines = document.querySelectorAll("#lista-cadastro-colaboradores tr");
+            let temporario = [];
+            lines.forEach((tr, idx) => {
+                const matEl = document.getElementById(`cad-mat-${idx}`); if(!matEl) return;
+                let nComp = document.getElementById(`cad-nome-${idx}`).value.trim();
+                let nDest = document.getElementById(`cad-destaque-${idx}`).value.trim();
+                let mat = matEl.value.trim();
+                let fun = document.getElementById(`cad-fun-${idx}`).value.trim();
+                let adm = document.getElementById(`cad-adm-${idx}`).value;
+                let stat = document.getElementById(`cad-status-${idx}`).value;
+                let desl = document.getElementById(`cad-desl-${idx}`).value;
+                if (mat !== "" || nComp !== "") {
+                    if(nDest === "" && nComp !== "") nDest = nComp.substring(0, 15);
+                    temporario.push({ matricula: mat, nome: nComp, nomeDestaque: nDest, funcao: fun, admissao: adm, status: stat, desligamento: desl });
+                }
+            });
+            colaboradoresAtuais = temporario;
+        }
+
+        function salvarLideres() {
+            lideres = { linha: document.getElementById('lider-linha').value, turno: document.getElementById('turno').value, lider: document.getElementById('lider-nome').value, supervisor: document.getElementById('supervisor-turno').value };
+            localStorage.setItem('f_lideres', JSON.stringify(lideres)); exibirMensagem('a estrutura operacional foi salva com sucesso!');
+        }
+
+        function salvarListaColaboradores() {
+            capturarValoresCampos(); const anoSelecionado = document.getElementById('filtro-ano').value;
+            localStorage.setItem('f_colaboradores', JSON.stringify(colaboradoresAtuais));
+            if (!historicoColaboradores[anoSelecionado]) historicoColaboradores[anoSelecionado] = {};
+            const colaboradoresAtivosMaster = colaboradoresAtuais.filter(c => c.status !== 'Desligado');
+            for (let m = 0; m < 12; m++) {
+                if (!historicoColaboradores[anoSelecionado][m]) {
+                    historicoColaboradores[anoSelecionado][m] = JSON.parse(JSON.stringify(colaboradoresAtivosMaster));
+                } else {
+                    let listaDoMes = historicoColaboradores[anoSelecionado][m];
+                    historicoColaboradores[anoSelecionado][m] = listaDoMes.filter(cMes => colaboradoresAtivosMaster.some(cMaster => cMaster.matricula === cMes.matricula && cMes.matricula !== ""));
+                    listaDoMes = historicoColaboradores[anoSelecionado][m];
+                    colaboradoresAtivosMaster.forEach(masterColab => {
+                        if(masterColab.matricula !== "") {
+                            let indexColab = listaDoMes.findIndex(c => c.matricula === masterColab.matricula);
+                            if(indexColab === -1) { listaDoMes.push(JSON.parse(JSON.stringify(masterColab))); } 
+                            else {
+                                listaDoMes[indexColab].nome = masterColab.nome;
+                                listaDoMes[indexColab].nomeDestaque = masterColab.nomeDestaque;
+                                listaDoMes[indexColab].funcao = masterColab.funcao;
+                                listaDoMes[indexColab].admissao = masterColab.admissao;
+                                listaDoMes[indexColab].status = masterColab.status;
+                                listaDoMes[indexColab].desligamento = masterColab.desligamento;
+                            }
+                        }
+                    });
+                }
+            }
+            localStorage.setItem('f_historico_colab', JSON.stringify(historicoColaboradores));
+            exibirMensagem('o cadastro master de colaboradores foi updated!'); atualizarFormularioCadastro(); renderFrequencia();
+        }
+
+        function replicarParaProximoAno() {
+            capturarValoresCampos(); const anoAtual = parseInt(document.getElementById('filtro-ano').value); const proximoAno = anoAtual + 1;
+            if (!historicoColaboradores[proximoAno]) historicoColaboradores[proximoAno] = {};
+            const somenteAtivos = colaboradoresAtuais.filter(c => c.status !== 'Desligado');
+            for (let m = 0; m < 12; m++) { historicoColaboradores[proximoAno][m] = JSON.parse(JSON.stringify(somenteAtivos)); }
+            localStorage.setItem('f_historico_colab', JSON.stringify(historicoColaboradores)); exibirMensagem(`a estrutura de colaboradores foi replicada para o ano de ${proximoAno}!`);
+        }
+
+        function dispararAcaoFeria(cIdx, diaInicio, matricula) {
+            const selectElement = document.getElementById(`cell-${cIdx}-${diaInicio}`); if (!selectElement || selectElement.value !== "FE") return;
+            const diasDigitados = prompt("Quantos dias de férias quer lançar a partir deste dia?"); const totalDias = parseInt(diasDigitados);
+            if (isNaN(totalDias) || totalDias <= 0) { selectElement.value = ""; selectElement.className = "select-cell status-"; return; }
+            let anoAtualLoop = parseInt(document.getElementById('filtro-ano').value); let mesAtualLoop = parseInt(document.getElementById('filtro-mes').value); let diaAtualLoop = parseInt(diaInicio);
+            for (let i = 0; i < totalDias; i++) {
+                if (!dadosFrequencia[anoAtualLoop]) dadosFrequencia[anoAtualLoop] = {};
+                if (!dadosFrequencia[anoAtualLoop][mesAtualLoop]) dadosFrequencia[anoAtualLoop][mesAtualLoop] = {};
+                if (!dadosFrequencia[anoAtualLoop][mesAtualLoop][matricula]) dadosFrequencia[anoAtualLoop][mesAtualLoop][matricula] = { dias: {}, obs: "" };
+                dadosFrequencia[anoAtualLoop][mesAtualLoop][matricula].dias[diaAtualLoop] = "FE";
+                diaAtualLoop++; let limiteDiasMes = new Date(anoAtualLoop, mesAtualLoop + 1, 0).getDate();
+                if (diaAtualLoop > limiteDiasMes) { diaAtualLoop = 1; mesAtualLoop++; if (mesAtualLoop > 11) { mesAtualLoop = 0; anoAtualLoop++; } }
+            }
+            localStorage.setItem('f_dados', JSON.stringify(dadosFrequencia)); exibirMensagem(`as férias de ${totalDias} dias foram inseridas com sucesso!`); renderFrequencia();
+        }
+
+        function marcarLinhaColaborador(trElement) {
+            const jaMarcado = trElement.classList.contains('linha-marcada');
+            document.querySelectorAll('#tbody-frequencia tr').forEach(row => row.classList.remove('linha-marcada'));
+            if (!jaMarcado) trElement.classList.add('linha-marcada');
+        }
+
+        function renderFrequencia() {
+            const ano = document.getElementById('filtro-ano').value; const mes = parseInt(document.getElementById('filtro-mes').value);
+            const hoje = new Date(); const ehAnoAtual = hoje.getFullYear() == ano; const ehMesAtual = hoje.getMonth() == mes; const diaHoje = hoje.getDate();
+            if (!historicoColaboradores[ano]) historicoColaboradores[ano] = {};
+            if (!historicoColaboradores[ano][mes]) historicoColaboradores[ano][mes] = JSON.parse(JSON.stringify(colaboradoresAtuais.filter(c => c.status !== 'Desligado')));
+            const colabs = historicoColaboradores[ano][mes]; const diasNoMes = new Date(ano, mes + 1, 0).getDate();
+            
+            document.getElementById('thr-1').innerHTML = `<th rowspan="2" class="sticky-col-1 col-nome">Nome</th>`;
+            document.getElementById('thr-2').innerHTML = '';
+            for(let d = 1; d <= diasNoMes; d++) {
+                let s = new Date(ano, mes, d).getDay(); let c = s === 0 ? 'sunday' : ''; if(ehAnoAtual && ehMesAtual && d === diaHoje) c += ' current-day-col';
+                document.getElementById('thr-1').innerHTML += `<th class="${c}">${d}</th>`;
+                document.getElementById('thr-2').innerHTML += `<th class="${c}" style="font-size:10px;">${['D','S','T','Q','Q','S','S'][s]}</th>`;
+            }
+            const tbody = document.getElementById('tbody-frequencia'); tbody.innerHTML = '';
+            if(!dadosFrequencia[ano]) dadosFrequencia[ano] = {}; if(!dadosFrequencia[ano][mes]) dadosFrequencia[ano][mes] = {};
+            colabs.forEach((colab, cIdx) => {
+                let mat = colab.matricula; if (!mat || mat.trim() === "") return;
+                if(!dadosFrequencia[ano][mes][mat]) dadosFrequencia[ano][mes][mat] = { dias: {}, obs: "" };
+                let reg = dadosFrequencia[ano][mes][mat]; let nomeExibidoPlanilha = colab.nomeDestaque || colab.nome || "";
+                let dataLimiteDesligamento = null;
+                if (colab.status === 'Desligado' && colab.desligamento) dataLimiteDesligamento = new Date(colab.desligamento + "T00:00:00");
+                
+                let rHtml = `<tr id="tr-colab-${cIdx}"><td class="sticky-col-1 col-nome" onclick="marcarLinhaColaborador(this.parentElement)">${nomeExibidoPlanilha}</td>`;
+                for(let d = 1; d <= diasNoMes; d++) {
+                    let v = reg.dias[d] || ''; let s = new Date(ano, mes, d).getDay();
+                    let celulaClasse = s === 0 ? "sunday" : ""; if(ehAnoAtual && ehMesAtual && d === diaHoje) celulaClasse += ' current-day-col';
+                    let diaBloqueadoPorDesligamento = false;
+                    if (dataLimiteDesligamento) { let dataCelulaCorrente = new Date(parseInt(ano), parseInt(mes), d); if (dataCelulaCorrente > dataLimiteDesligamento) diaBloqueadoPorDesligamento = true; }
+                    if (diaBloqueadoPorDesligamento) { rHtml += `<td class="${celulaClasse} cell-desligado"><span class="status-DESL">DESL</span></td>`; } 
+                    else {
+                        rHtml += `<td class="${celulaClasse}">
+                            <select class="select-cell status-${v}" id="cell-${cIdx}-${d}" onchange="this.className='select-cell status-'+this.value; dispararAcaoFeria(${cIdx}, ${d}, '${mat}')">
+                            <option value="">-</option><option value="F" ${v==='F'?'selected':''}>F</option><option value="S" ${v==='S'?'selected':''}>S</option><option value="A" ${v==='A'?'selected':''}>A</option><option value="AV" ${v==='AV'?'selected':''}>AV</option><option value="AE" ${v==='AE'?'selected':''}>AE</option><option value="Sus" ${v==='Sus'?'selected':''}>Sus</option><option value="FE" ${v==='FE'?'selected':''}>FE</option>
+                        </select></td>`;
+                    }
+                }
+                rHtml += `<input type="hidden" id="obs-${cIdx}" value="${reg.obs || ''}"></tr>`; tbody.innerHTML += rHtml;
+            });
+        }
+
+        function salvarDadosMes() {
+            const ano = document.getElementById('filtro-ano').value; const mes = parseInt(document.getElementById('filtro-mes').value); const diasNoMes = new Date(ano, mes + 1, 0).getDate();
+            if (!historicoColaboradores[ano] || !historicoColaboradores[ano][mes]) return;
+            historicoColaboradores[ano][mes].forEach((colab, cIdx) => {
+                let mat = colab.matricula; if(!mat || mat.trim() === "") return;
+                let diasObj = {};
+                for(let d = 1; d <= diasNoMes; d++) { const el = document.getElementById(`cell-${cIdx}-${d}`); if(el && el.value) diasObj[d] = el.value; }
+                const obsEl = document.getElementById(`obs-${cIdx}`); let obsVal = obsEl ? obsEl.value : "";
+                if(!dadosFrequencia[ano][mes]) dadosFrequencia[ano][mes] = {}; dadosFrequencia[ano][mes][mat] = { dias: diasObj, obs: obsVal };
+            });
+            localStorage.setItem('f_dados', JSON.stringify(dadosFrequencia)); localStorage.setItem('f_historico_colab', JSON.stringify(historicoColaboradores)); exibirMensagem('os dados de frequência foram salvos com sucesso!');
+        }
+
+        function renderDashboard() {
+            const escopo = document.getElementById('dash-periodo').value;
+            const anoSel = document.getElementById('dash-ano').value;
+            const mesSel = parseInt(document.getElementById('dash-mes').value);
+
+            let totaisPorColab = {}; let totaisGeraisOcorrencias = { F: 0, S: 0, A: 0, AV: 0, AE: 0, Sus: 0, FE: 0 };
+            colaboradoresAtuais.forEach(c => { if(c.matricula) totaisPorColab[c.matricula] = { nome: c.nome, faltas: 0, atestados: 0 }; });
+
+            let anosParaVarrer = (escopo === 'todos-anos') ? Object.keys(dadosFrequencia) : [anoSel];
+            anosParaVarrer.forEach(ano => {
+                if (!dadosFrequencia[ano]) return;
+                let mesesParaVarrer = (escopo === 'todos-anos') ? Object.keys(dadosFrequencia[ano]) : [mesSel];
+                mesesParaVarrer.forEach(m => {
+                    if (!dadosFrequencia[ano][m]) return;
+                    Object.keys(dadosFrequencia[ano][m]).forEach(mat => {
+                        let reg = dadosFrequencia[ano][m][mat];
+                        if (reg && reg.dias) {
+                            Object.keys(reg.dias).forEach(d => {
+                                let status = reg.dias[d];
+                                if(totaisGeraisOcorrencias.hasOwnProperty(status)) totaisGeraisOcorrencias[status]++;
+                                if(totaisPorColab[mat]) {
+                                    if(status === 'F') totaisPorColab[mat].faltas++;
+                                    if(status === 'A') totaisPorColab[mat].atestados++;
+                                }
+                            });
+                        }
+                    });
+                });
+            });
+
+            const arrayColabs = Object.keys(totaisPorColab).map(m => ({ matricula: m, ...totaisPorColab[m] }));
+            const rankingFaltas = [...arrayColabs].sort((a,b) => b.faltas - a.faltas).filter(x => x.faltas > 0).slice(0, 5);
+            const rankingAtestados = [...arrayColabs].sort((a,b) => b.atestados - a.atestados).filter(x => x.atestados > 0).slice(0, 5);
+
+            document.getElementById('ranking-faltas').innerHTML = rankingFaltas.length === 0 ? '<p style="color:#64748b; font-style:italic; font-size:12px;">Nenhuma falta.</p>' : 
+                rankingFaltas.map((c, i) => `<div class="ranking-item"><span class="ranking-name">${i+1}º ${c.nome.substring(0, 18)}</span><span class="ranking-count">${c.faltas} F</span></div>`).join('');
+
+            document.getElementById('ranking-atestados').innerHTML = rankingAtestados.length === 0 ? '<p style="color:#64748b; font-style:italic; font-size:12px;">Nenhum atestado.</p>' : 
+                rankingAtestados.map((c, i) => `<div class="ranking-item"><span class="ranking-name">${i+1}º ${c.nome.substring(0, 18)}</span><span class="ranking-count atestado">${c.atestados} A</span></div>`).join('');
+
+            const maxValor = Math.max(...Object.values(totaisGeraisOcorrencias), 1);
+            const containerGraficos = document.getElementById('graficos-container');
+            const labelsTraduzidas = { 'F': 'Faltas Não Justificadas (F)', 'S': 'Saídas Antecipadas / Atrasos (S)', 'A': 'Atestados Médicos (A)', 'AV': 'Advertências Verbais (AV)', 'AE': 'Advertências Escritas (AE)', 'Sus': 'Suspensões (Sus)', 'FE': 'Férias (FE)' };
+
+            let graficosHTML = '';
+            Object.keys(totaisGeraisOcorrencias).forEach(status => {
+                let qtd = totaisGeraisOcorrencias[status]; let pct = (qtd / maxValor) * 100;
+                let corClasse = (status === 'F' || status === 'AV' || status === 'AE' || status === 'Sus') ? 'fill-falta' : 'fill-atestado';
+                graficosHTML += `<div class="chart-row">
+                    <div class="chart-label"><span>${labelsTraduzidas[status] || status}</span><strong>${qtd} ocorrência(s)</strong></div>
+                    <div class="chart-bar-bg"><div class="chart-bar-fill ${corClasse}" style="width: ${pct}%;"></div></div>
+                </div>`;
+            });
+            containerGraficos.innerHTML = graficosHTML;
+        }
+
+        function abrirPainelFeedback() {
+            document.getElementById('modal-feedback').style.display = 'flex'; const s = document.getElementById('feed-colaborador'); s.innerHTML = '';
+            colaboradoresAtuais.forEach(c => { if(c.matricula && c.matricula.trim() !== "") s.innerHTML += `<option value="${c.matricula}">${c.nome}</option>`; });
+            s.onchange = renderTimelineFeedback; renderTimelineFeedback();
+        }
+        function fecharModal() { document.getElementById('modal-feedback').style.display = 'none'; }
+        
+        function salvarFeedbackIndividual() {
+            const mat = document.getElementById('feed-colaborador').value; 
+            const txt = document.getElementById('feed-texto').value; 
+            if (!txt.trim()) { exibirMensagem('por favor, digite um texto para registrar o feedback individual.'); return; }
+            if (!feedbackDados[mat]) feedbackDados[mat] = []; 
+            feedbackDados[mat].unshift({ data: new Date().toLocaleDateString('pt-BR'), texto: txt.trim() });
+            localStorage.setItem('f_feedbacks', JSON.stringify(feedbackDados)); 
+            document.getElementById('feed-texto').value = ''; 
+            renderTimelineFeedback(); exibirMensagem('feedback individual registrado com sucesso!');
+        }
+
+        function salvarReuniaoGeral() {
+            const txt = document.getElementById('feed-texto').value; 
+            if (!txt.trim()) { exibirMensagem('por favor, digite o asunto da reunião geral antes de salvar.'); return; }
+            const dataHojeStr = new Date().toLocaleDateString('pt-BR');
+            const textoCompleto = `[Reunião Geral] ${txt.trim()}`;
+            let totalInserido = 0;
+            colaboradoresAtuais.forEach(colab => {
+                if (colab.matricula && colab.matricula.trim() !== "") {
+                    let mat = colab.matricula;
+                    if (!feedbackDados[mat]) feedbackDados[mat] = [];
+                    feedbackDados[mat].unshift({ data: dataHojeStr, texto: textoCompleto });
+                    totalInserido++;
+                }
+            });
+            localStorage.setItem('f_feedbacks', JSON.stringify(feedbackDados));
+            document.getElementById('feed-texto').value = ''; 
+            exibirMensagem(`a reunião geral foi salva com sucesso para ${totalInserido} colaboradores.`);
+            renderTimelineFeedback();
+        }
+
+        function renderTimelineFeedback() {
+            const mat = document.getElementById('feed-colaborador').value; const c = document.getElementById('timeline-feedback'); c.innerHTML = '';
+            if(!feedbackDados[mat] || feedbackDados[mat].length === 0) { c.innerHTML = '<p style="color:#64748b; font-style:italic;">Nenhum registro para este colaborador.</p>'; return; }
+            feedbackDados[mat].forEach((f, idx) => { c.innerHTML += `<div class="feedback-entry"><span class="btn-deletar-feedback" onclick="excluirFeedback('${mat}', ${idx})">&times;</span><small>${f.data}</small><p style="margin-top: 5px; padding-right: 20px;">${f.texto}</p></div>`; });
+        }
+        function excluirFeedback(matricula, index) { if (confirm("Excluir registro de feedback?")) { feedbackDados[matricula].splice(index, 1); localStorage.setItem('f_feedbacks', JSON.stringify(feedbackDados)); renderTimelineFeedback(); } }
+
+        function atualizarSeletoresRelatorios() {
+            const s = document.getElementById('rep-colaborador'); s.innerHTML = '';
+            colaboradoresAtuais.forEach(c => { if(c.matricula && c.matricula.trim() !== "") s.innerHTML += `<option value="${c.matricula}">${c.nome} (${c.matricula})</option>`; });
+        }
+
+        function processarMecanicaOcorrencias(mat, ano, escopo, mesSelecionado) {
+            let contadores = { F: 0, S: 0, A: 0, AV: 0, AE: 0, Sus: 0, FE: 0 };
+            let mesesParaVarrer = (escopo === 'anual') ? [0,1,2,3,4,5,6,7,8,9,10,11] : [mesSelecionado];
+            if (dadosFrequencia[ano]) {
+                mesesParaVarrer.forEach(m => {
+                    if (dadosFrequencia[ano][m] && dadosFrequencia[ano][m][mat]) {
+                        let registro = dadosFrequencia[ano][m][mat];
+                        for (let d in registro.dias) { if (contadores.hasOwnProperty(registro.dias[d])) contadores[registro.dias[d]]++; }
+                    }
+                });
+            }
+            return { contadores };
+        }
+
+        function formatarDataBR(dataISO) { if(!dataISO) return ''; const partes = dataISO.split('-'); return partes.length !== 3 ? dataISO : `${partes[2]}/${partes[1]}/${partes[0]}`; }
+        
+        function calcularTempoDeCasa(dataAdmissaoISO, dataDesligamentoISO, anoRelatorio, mesRelatorio, escopo) {
+            if (!dataAdmissaoISO) return ""; const adm = new Date(dataAdmissaoISO + "T00:00:00"); let ref = dataDesligamentoISO ? new Date(dataDesligamentoISO + "T00:00:00") : new Date(parseInt(anoRelatorio), (escopo === 'anual' ? 11 : parseInt(mesRelatorio)) + 1, 0);
+            if (adm > ref) return ""; let anos = ref.getFullYear() - adm.getFullYear(); let meses = ref.getMonth() - adm.getMonth(); if (meses < 0) { anos--; meses += 12; }
+            let res = []; if (anos > 0) res.push(`${anos} ano${anos > 1 ? 's' : ''}`); if (meses > 0) res.push(`${meses} mê${meses > 1 ? 'ses' : 's'}`);
+            let finalStr = res.length > 0 ? res.join(' e ') : "Menos de 1 mês"; if (dataDesligamentoISO) finalStr += " (Até o desliga.)"; return finalStr;
+        }
+
+        function gerarRelatorioConsolidadoCompleto() {
+            const mat = document.getElementById('rep-colaborador').value; 
+            const ano = document.getElementById('rep-ano').value; 
+            const escopo = document.getElementById('rep-periodo').value; 
+            const mes = parseInt(document.getElementById('rep-mes').value); 
+            const nomeMes = document.getElementById('rep-mes').options[mes].text;
+            const colab = colaboradoresAtuais.find(c => c.matricula === mat); 
+            if (!colab) return alert('Selecione um colaborador.');
+            
+            const dataAgora = new Date();
+            const diasSemanaNomes = ["Domingo", "Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sábado"];
+            const resultado = processarMecanicaOcorrencias(mat, ano, escopo, mes);
+            
+            const f_val = resultado.contadores.F; const s_val = resultado.contadores.S; const a_val = resultado.contadores.A; const av_val = resultado.contadores.AV; const ae_val = resultado.contadores.AE; const sus_val = resultado.contadores.Sus; const fe_val = resultado.contadores.FE;
+
+            let feedbacksHTML = '';
+            if (feedbackDados[mat] && feedbackDados[mat].length > 0) {
+                feedbackDados[mat].forEach(f => { feedbacksHTML += `<div style="margin-bottom: 8px; padding: 6px; border-bottom: 1px dashed #ccc; font-size: 12px;"><b style="color:#475569;">[${f.data}]</b> ${f.texto}</div>`; });
+            } else { feedbacksHTML = `<p style="color:#64748b; font-style:italic; font-size:12px; margin:5px 0 0 0;">Nenhum feedback registrado.</p>`; }
+
+            let listaMesesParaVarrer = (escopo === 'anual') ? [11,10,9,8,7,6,5,4,3,2,1,0] : [mes];
+            let todasOcorrenciasLinhas = [];
+
+            if (dadosFrequencia[ano]) {
+                listaMesesParaVarrer.forEach(m => {
+                    if (dadosFrequencia[ano][m] && dadosFrequencia[ano][m][mat]) {
+                        let registro = dadosFrequencia[ano][m][mat];
+                        let totalDiasNoMes = new Date(ano, m + 1, 0).getDate();
+                        for (let d = 1; d <= totalDiasNoMes; d++) {
+                            let sigla = registro.dias[d];
+                            if (sigla) {
+                                let dataObjeto = new Date(parseInt(ano), m, d);
+                                todasOcorrenciasLinhas.push({ timestamp: dataObjeto.getTime(), dataObj: dataObjeto, dia: d, mes: m, sigla: sigla });
+                            }
+                        }
+                    }
+                });
+            }
+
+            todasOcorrenciasLinhas.sort((a, b) => a.timestamp - b.timestamp);
+            let ocorrenciasProcessadas = []; let i = 0;
+
+            while (i < todasOcorrenciasLinhas.length) {
+                let ocorrenciaAtual = todasOcorrenciasLinhas[i];
+                if (ocorrenciaAtual.sigla === 'FE') {
+                    let blocoFerias = [ocorrenciaAtual]; let j = i + 1;
+                    while (j < todasOcorrenciasLinhas.length) {
+                        let proximaOcorrencia = todasOcorrenciasLinhas[j];
+                        if (proximaOcorrencia.sigla === 'FE') {
+                            let diaEsperado = new Date(blocoFerias[blocoFerias.length - 1].dataObj); diaEsperado.setDate(diaEsperado.getDate() + 1);
+                            if (proximaOcorrencia.dataObj.toDateString() === diaEsperado.toDateString()) { blocoFerias.push(proximaOcorrencia); j++; } else { break; }
+                        } else { break; }
+                    }
+                    let totalDiasFerias = blocoFerias.length; let primeiroDia = blocoFerias[0]; let ultimoDia = blocoFerias[blocoFerias.length - 1];
+                    let dataInicioStr = `${primeiroDia.dia < 10 ? '0'+primeiroDia.dia : primeiroDia.dia}/${(primeiroDia.mes+1) < 10 ? '0'+(primeiroDia.mes+1) : (primeiroDia.mes+1)}`;
+                    let dataFimStr = `${ultimoDia.dia < 10 ? '0'+ultimoDia.dia : ultimoDia.dia}/${(ultimoDia.mes+1) < 10 ? '0'+(ultimoDia.mes+1) : (ultimoDia.mes+1)}`;
+                    ocorrenciasProcessadas.push({ timestamp: primeiroDia.timestamp, html: `<tr><td style="font-weight:bold; text-align:center;">${dataInicioStr} até ${dataFimStr}</td><td style="text-align:left;">Contínuo</td><td style="text-align:center;"><span class="status-FE" style="padding:1px 6px; border-radius:3px; font-weight:bold; font-size:11px;">FE</span></td><td style="font-weight:600; text-align:left; color:#115e59;">Período de Férias (${totalDiasFerias} dias)</td></tr>` });
+                    i = j;
+                } else if (ocorrenciaAtual.sigla === 'A') {
+                    let blocoAtestado = [ocorrenciaAtual]; let j = i + 1;
+                    while (j < todasOcorrenciasLinhas.length) {
+                        let proximaOcorrencia = todasOcorrenciasLinhas[j];
+                        if (proximaOcorrencia.sigla === 'A') {
+                            let diaEsperado = new Date(blocoAtestado[blocoAtestado.length - 1].dataObj); diaEsperado.setDate(diaEsperado.getDate() + 1);
+                            if (proximaOcorrencia.dataObj.toDateString() === diaEsperado.toDateString()) { blocoAtestado.push(proximaOcorrencia); j++; } else { break; }
+                        } else { break; }
+                    }
+                    let primeiroDia = blocoAtestado[0]; let ultimoDia = blocoAtestado[blocoAtestado.length - 1];
+                    let dataInicioStr = `${primeiroDia.dia < 10 ? '0'+primeiroDia.dia : primeiroDia.dia}/${(primeiroDia.mes+1) < 10 ? '0'+(primeiroDia.mes+1) : (primeiroDia.mes+1)}`;
+                    let dataFimStr = `${ultimoDia.dia < 10 ? '0'+ultimoDia.dia : ultimoDia.dia}/${(ultimoDia.mes+1) < 10 ? '0'+(ultimoDia.mes+1) : (ultimoDia.mes+1)}`;
+                    if (blocoAtestado.length > 1) {
+                        ocorrenciasProcessadas.push({ timestamp: primeiroDia.timestamp, html: `<tr><td style="font-weight:bold; text-align:center;">${dataInicioStr} até ${dataFimStr}</td><td style="text-align:left;">Contínuo</td><td style="text-align:center;"><span class="status-A" style="padding:1px 6px; border-radius:3px; font-weight:bold; font-size:11px;">A</span></td><td style="font-weight:600; text-align:left;">Atestado Médico</td></tr>` });
+                    } else {
+                        let d = primeiroDia.dia; let m = primeiroDia.mes; let diaSemanaStr = diasSemanaNomes[primeiroDia.dataObj.getDay()]; let dataFormatada = `${d < 10 ? '0'+d : d}/${(m+1) < 10 ? '0'+(m+1) : (m+1)}/${ano}`;
+                        ocorrenciasProcessadas.push({ timestamp: primeiroDia.timestamp, html: `<tr><td style="font-weight:bold; text-align:center;">${dataFormatada}</td><td style="text-align:left;">${diaSemanaStr}</td><td style="text-align:center;"><span class="status-A" style="padding:1px 6px; border-radius:3px; font-weight:bold; font-size:11px;">A</span></td><td style="font-weight:600; text-align:left;">${labelsOcorrenciasCompletas['A']}</td></tr>` });
+                    }
+                    i = j;
+                } else {
+                    let d = ocorrenciaAtual.dia; let m = ocorrenciaAtual.mes; let sigla = ocorrenciaAtual.sigla; let diaSemanaStr = diasSemanaNomes[ocorrenciaAtual.dataObj.getDay()]; let dataFormatada = `${d < 10 ? '0'+d : d}/${(m+1) < 10 ? '0'+(m+1) : (m+1)}/${ano}`;
+                    ocorrenciasProcessadas.push({ timestamp: ocorrenciaAtual.timestamp, html: `<tr><td style="font-weight:bold; text-align:center;">${dataFormatada}</td><td style="text-align:left;">${diaSemanaStr}</td><td style="text-align:center;"><span class="status-${sigla}" style="padding:1px 6px; border-radius:3px; font-weight:bold; font-size:11px;">${sigla}</span></td><td style="font-weight:600; text-align:left;">${labelsOcorrenciasCompletas[sigla]}</td></tr>` });
+                    i++;
+                }
+            }
+
+            ocorrenciasProcessadas.sort((a, b) => b.timestamp - a.timestamp);
+            let linhasOcorrenciasHTML = ocorrenciasProcessadas.map(o => o.html).join('');
+            if (ocorrenciasProcessadas.length === 0) { linhasOcorrenciasHTML = `<tr><td colspan="4" style="text-align:center; color:#64748b; font-style:italic; padding: 15px;">Nenhuma ocorrência encontrada.</td></tr>`; }
+
+            let setorTurnoCombinado = `${lideres.linha || 'Não Informado'} / ${lideres.turno || 'Não Definido'}`;
+            let thHTML = ''; let tdHTML = '';
+            if (f_val > 0) { thHTML += '<th>Falta (F)</th>'; tdHTML += `<td style="font-size:15px; font-weight:bold; height:35px;">${f_val}</td>`; }
+            if (s_val > 0) { thHTML += '<th>Saída/Atraso (S)</th>'; tdHTML += `<td style="font-size:15px; font-weight:bold;">${s_val}</td>`; }
+            if (a_val > 0) { thHTML += '<th>Atestado (A)</th>'; tdHTML += `<td style="font-size:15px; font-weight:bold;">${a_val}</td>`; }
+            if (av_val > 0) { thHTML += '<th>Adv. Verbal (AV)</th>'; tdHTML += `<td style="font-size:15px; font-weight:bold;">${av_val}</td>`; }
+            if (ae_val > 0) { thHTML += '<th>Adv. Escrita (AE)</th>'; tdHTML += `<td style="font-size:15px; font-weight:bold;">${ae_val}</td>`; }
+            if (sus_val > 0) { thHTML += '<th>Suspensão (Sus)</th>'; tdHTML += `<td style="font-size:15px; font-weight:bold;">${sus_val}</td>`; }
+            if (fe_val > 0) { thHTML += '<th>Férias (FE)</th>'; tdHTML += `<td style="font-size:15px; font-weight:bold; color: #115e59; background-color: #ccfbf1;">${fe_val}</td>`; }
+            if (thHTML === '') { thHTML = '<th>Ocorrências Registradas</th>'; tdHTML = '<td style="font-size:13px; color:#64748b; font-style:italic; height:35px;">Nenhuma ocorrência computada no período.</td>'; }
+
+            let htmlFinal = `<div class="doc-frequencia-container">
+                    <div class="doc-header">
+                        <div class="doc-title"><h2>Ficha Consolidada de Ocorrências e Frequência</h2><p>Período: <b>${escopo === 'anual' ? `Ano Completo de ${ano}` : `${nomeMes} de ${ano}`}</b></p></div>
+                        <div class="doc-meta"><b>Emissão:</b> ${dataAgora.toLocaleDateString('pt-BR')}<br><b>Horário:</b> ${dataAgora.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</div>
+                    </div>
+                    <div class="doc-section-title">Identificação do Funcionário</div>
+                    <table class="ficha-dados"><tr><td><span class="label-small">Matrícula</span><span class="valor-grande">${colab.matricula}</span><br><span class="label-small">Nome</span><span class="valor-grande">${colab.nome}</span></td><td><span class="label-small">Cargo / Função</span><span class="valor-grande">${colab.funcao || 'Operador'}</span><br><span class="label-small">Setor & Turno</span><span class="valor-grande">${setorTurnoCombinado}</span></td><td><span class="label-small">Admissão</span><span class="valor-grande">${formatarDataBR(colab.admissao) || 'Não Cadastrada'}</span><br><span class="label-small">Tempo de Casa</span><span class="valor-grande">${calcularTempoDeCasa(colab.admissao, colab.desligamento, ano, mes, escopo)}</span></td></tr></table>
+                    <div class="doc-section-title">Estrutura de Gestão Direta</div>
+                    <table class="ficha-dados"><tr><td><span class="label-small">Líder de Equipe</span><span class="valor-grande">${lideres.lider || 'Não Cadastrado'}</span></td><td><span class="label-small">Supervisor Direto</span><span class="valor-grande">${lideres.supervisor || 'Não Cadastrado'}</span></td><td><span class="label-small">Situação Cadastral</span><span class="valor-grande">${colab.status === 'Desligado' ? `<b style="color:red;">Desligado em ${formatarDataBR(colab.desligamento)}</b>` : 'Ativo'}</span></td></tr></table>
+                    <div class="doc-section-title">Resumo de Ocorrências</div>
+                    <table class="tabela-alinhada"><thead><tr>${thHTML}</tr></thead><tbody><tr>${tdHTML}</tr></tbody></table>
+                    <div class="doc-section-title">Histórico de Feedbacks & Alinhamentos</div><div class="bloco-texto-print">${feedbacksHTML}</div>
+                    <div class="doc-section-title">Histórico Cronológico Descritivo (Ordem Decrescente)</div>
+                    <table class="tabela-alinhada"><thead><tr><th style="width:180px;">Data / Período</th><th style="width:140px; text-align:left;">Dia da Semana</th><th style="width:70px;">Cód</th><th style="text-align:left;">Descrição Completa</th></tr></thead><tbody>${linhasOcorrenciasHTML}</tbody></table>
+                    <div style="margin-top: 8px; text-align:right; font-size:11px; color:#475569;">Total de linhas de eventos listadas: <b>${ocorrenciasProcessadas.length}</b></div>
+                    <div style="margin-top: 50px; display: flex; justify-content: space-between; font-size: 11px; page-break-inside: avoid;"><div style="width: 220px; border-top: 1px solid #000; text-align: center; padding-top: 4px;">Assinatura do Gestor / Líder</div><div style="width: 220px; border-top: 1px solid #000; text-align: center; padding-top: 4px;">Assinatura do Colaborador</div></div>
+                </div>`;
+
+            document.getElementById('conteudo-preview-isolado').innerHTML = htmlFinal; 
+            document.getElementById('preview-relatorio').style.display = 'block'; 
+            document.getElementById('preview-relatorio').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function baixarFichaPDF() { window.print(); }
+
+        window.addEventListener('beforeunload', function (e) {
+            if (document.getElementById('main-system').style.display === 'block' && document.getElementById('frequencia').classList.contains('active')) {
+                salvarDadosMes(); e.preventDefault(); e.returnValue = '';
+            }
+        });
+
+        // --- SISTEMA DE INSTALAÇÃO DO APLICATIVO (PWA) ---
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('sw.js').then(() => console.log('Service Worker Ativo'));
+        }
+
+        let eventoInstalacao;
+        const bannerInstalar = document.getElementById('pwa-install-banner');
+        const btnInstalar = document.getElementById('btn-pwa-install');
+
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            eventoInstalacao = e;
+            bannerInstalar.style.display = 'block'; // Mostra a barra para o usuário baixar
+        });
+
+        btnInstalar.addEventListener('click', () => {
+            if (eventoInstalacao) {
+                eventoInstalacao.prompt();
+                eventoInstalacao.userChoice.then((choiceResult) => {
+                    if (choiceResult.outcome === 'accepted') {
+                        bannerInstalar.style.display = 'none';
+                    }
+                    eventoInstalacao = null;
+                });
+            }
+        });
+
+        window.addEventListener('appinstalled', () => {
+            bannerInstalar.style.display = 'none';
+            exibirMensagem('Aplicativo instalado com sucesso!');
+        });
+    </script>
+</body>
+</html>
